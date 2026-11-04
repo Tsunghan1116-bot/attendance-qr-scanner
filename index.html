@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>重新掃描課堂 QR</title>
+<style>body{font:17px system-ui,-apple-system,sans-serif;background:#f3f6f9;color:#172b3a;margin:0}main{max-width:520px;margin:18px auto;background:white;padding:20px;border-radius:12px}h1{font-size:23px}video{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#172b3a;border-radius:8px}button{font:inherit;padding:12px 16px;min-height:44px;margin:10px 8px 0 0}#status{min-height:3em;line-height:1.5}small{display:block;line-height:1.5;color:#52616c}@media(max-width:560px){main{margin:0;min-height:100dvh;border-radius:0;box-sizing:border-box}}</style>
+<main><h1>掃描老師目前的 QR</h1><p id="status" role="status" aria-live="polite">正在準備相機…</p><video id="camera" autoplay muted playsinline></video><button id="retry" type="button" hidden>重新開啟相機</button><button id="cancel" type="button">取消掃描</button><small>掃到後會回到原本已登入的簽到頁核票。掃碼本身不會完成簽到；仍須核對本人與場次，再按「確認本人並簽到」。</small></main>
+<script src="jsQR.js"></script><script>
+const status=document.getElementById('status'),video=document.getElementById('camera'),retry=document.getElementById('retry');
+const params=new URLSearchParams(location.hash.slice(1)),nonce=params.get('nonce'),parentOrigin=params.get('parentOrigin');
+const allowedParent=parentOrigin&&/^https:\/\/(?:script\.googleusercontent\.com|script\.google\.com)$/.test(parentOrigin)||/^http:\/\/127\.0\.0\.1:\d+$/.test(parentOrigin||'');
+let stream=null,frame=0,sent=false,busy=false;const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{willReadFrequently:true});
+function stop(){if(frame)cancelAnimationFrame(frame);frame=0;if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}}
+async function start(){stop();sent=false;busy=false;retry.hidden=true;
+  if(!allowedParent||!/^[a-f0-9]{32}$/.test(nonce||'')||!window.opener){status.textContent='無法連回原本的簽到頁，請關閉此頁後從簽到頁重新開啟掃碼。';return;}
+  if(!navigator.mediaDevices?.getUserMedia||typeof jsQR!=='function'){status.textContent='此瀏覽器無法使用即時掃碼，請換用手機瀏覽器或找老師協助。';return;}
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});video.srcObject=stream;await video.play();status.textContent='請將老師目前顯示的 QR 對準方框。';frame=requestAnimationFrame(scan);}catch(_){status.textContent='相機未開啟。請允許相機權限後重試；仍失敗請找老師協助。';retry.hidden=false;}
+}
+function scan(){if(sent||!stream)return;if(!busy&&video.readyState>=2&&video.videoWidth){busy=true;const width=Math.min(640,video.videoWidth),height=Math.round(video.videoHeight*width/video.videoWidth);canvas.width=width;canvas.height=height;context.drawImage(video,0,0,width,height);const data=context.getImageData(0,0,width,height);const result=jsQR(data.data,width,height,{inversionAttempts:'dontInvert'});busy=false;if(result){sent=true;stop();status.textContent='已掃到 QR，正在送回簽到頁核票…';window.opener.postMessage({type:'attendance-rescan-qr',nonce,qrUrl:result.data},parentOrigin);return;}}
+  frame=requestAnimationFrame(scan);
+}
+window.addEventListener('message',event=>{if(event.source!==window.opener||event.origin!==parentOrigin||event.data?.type!=='attendance-rescan-ack'||event.data?.nonce!==nonce)return;status.textContent='已送回簽到頁，請查看核票結果。';window.close();});
+window.addEventListener('message',event=>{if(event.source!==window.opener||event.origin!==parentOrigin||event.data?.type!=='attendance-rescan-reject'||event.data?.nonce!==nonce)return;status.textContent='掃到的不是課堂簽到 QR。請對準老師目前顯示的 QR 再試。';retry.hidden=false;});
+window.addEventListener('pagehide',stop);retry.onclick=start;document.getElementById('cancel').onclick=()=>{stop();window.close();};start();
+</script></html>
