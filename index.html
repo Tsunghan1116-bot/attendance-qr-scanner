@@ -5,7 +5,7 @@
 <script src="jsQR.js"></script><script>
 const status=document.getElementById('status'),video=document.getElementById('camera'),retry=document.getElementById('retry');
 const params=new URLSearchParams(location.hash.slice(1)),nonce=params.get('nonce'),parentOrigin=params.get('parentOrigin');
-const allowedParent=parentOrigin&&/^https:\/\/(?:script\.googleusercontent\.com|script\.google\.com)$/.test(parentOrigin)||/^http:\/\/127\.0\.0\.1:\d+$/.test(parentOrigin||'');
+const allowedParent=parentOrigin&&/^https:\/\/(?:(?:[a-z0-9-]+-)?script\.googleusercontent\.com|script\.google\.com)$/.test(parentOrigin)||/^http:\/\/127\.0\.0\.1:\d+$/.test(parentOrigin||'');
 let stream=null,frame=0,sent=false,busy=false;const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{willReadFrequently:true});
 function stop(){if(frame)cancelAnimationFrame(frame);frame=0;if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}}
 async function start(){stop();sent=false;busy=false;retry.hidden=true;
